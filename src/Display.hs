@@ -1,19 +1,21 @@
 module Display
       ( boxEdgeH
-			, gridSideEdge
-			, gridSpaceRow
+      , gridSideEdge
+      , gridSpaceRow
       , emptyGrid
       , displayEmptyGrid
       , fakeNumberGrid
       , makeNumberRowSegment
       , fakeCharGrid
-			) where
+      , displayNumberGrid 
+      ) where
 
 import Data.Char
 import Data.List
 import Data.String.Utils(replace)
 
 -- terminology:
+
 --	Grid: the whole sudoku puzzle made up of 9 Boxes
 --  Box: a 3 cell x 3 cell square
 --	Cell: is either blank or contains 1 digit
@@ -38,8 +40,8 @@ magenta = "\ESC[35m"
 cyan = "\ESC[36m"
 white = "\ESC[37m"
 
-int2char a = (show a) !! 0
 
+int2char a = (show a) !! 0
 fakeNumberGrid = replicate 9 [1..9]
 fakeCharGrid = map (map int2char) fakeNumberGrid
 
@@ -48,6 +50,7 @@ formattedFakeNumberGrid = concat $ map appendNewLine fakeCharGrid
 
 -- actually puts it on the screen
 displayEmptyGrid = putStrLn $ emptyGrid(fakeCharGrid)
+displayNumberGrid grid = putStrLn $ emptyGrid grid
 
 -- Full grid display as string
 emptyGrid g = 
