@@ -1,124 +1,87 @@
 module Lib
-    ( filteredEliminateFromCell
-    , invalid
-    , cellCoordsMatch
-    , getNewVersion
-    , getBox
-    , getBoxRows
-    , getBoxCoord
-    , getBoxCoords 
-    , eliminateFromRow
+    ( 
+-- Types
+      Cell(Cell)
+-- Constants
+    , gridSize
+-- Creation
+    , mkGrid
+    , newCell
+-- Transformation
+    , setValue
+    , chooseCellInGrid
+    , filteredEliminateFromCell
+    , advanceBookMark 
+    , replaceCellInRow
+    , replaceCellFrom
+    , replaceRowInGrid
+    , replaceCellsInGrid
     , eliminateFromCell
-    , int2char 
+    , eliminateFromRow
+-- Retrieval
     , justVals 
     , justCoords 
-    , dmap
+    , getBox
+    , getBoxRows
     , getCell 
     , getCellCoords 
+    , getBoxCoord
+    , getBoxCoords 
     , getCellValue
-    , generateSmallRandomValues 
-    , advanceBookMark 
-    , randomNumber
-    , newCell
-    , Cell(Cell)
-    , mkGrid
-    , replaceCellInRow
-    , replaceCellsInGrid
-    , replaceRowInGrid
+-- Query
+    , cellCoordsMatch
+-- Randomness
     , genRandGrid
     , generateRandomValues
     , setRandomValue
-    , makeSmallerGrid 
-    , setValue
     , randomNumberFromArray 
-    , chooseCellInGrid
+-- Utils
+    , invalid
+    , dmap
+    , int2char 
     ) where
 
 import Display
 import System.Random
 
-randomNumber :: StdGen -> (Int, StdGen)
-randomNumber = randomR (1,9)
+-- Types
+-- -----
 
-randomNumberFromArray :: StdGen -> [Int] -> (Int, StdGen)
-randomNumberFromArray gen arr = 
-  let l = length arr
-      lastIndex = l - 1
-      (i,g) = randomR (0,lastIndex) gen 
-      n = arr !! i
-  in (n,g)
-
-
-makeRandomRow _ 0 _ = []
-makeRandomRow gen countOfNumsToFind chosenNums = 
-  let (newNum,newGen) = randomNumber gen
-  in if chosenNums `contains` newNum
-    then ( makeRandomRow newGen countOfNumsToFind chosenNums) -- try again
-    else newNum : makeRandomRow newGen (countOfNumsToFind-1) (newNum : chosenNums) -- add new number to found items
-
--- int2char a = (show a) !! 0
-
--- showRandomGrid gen = displayNumberGrid $ map (map int2char) (makeRandomGrid gen)
--- makeRandomGrid gen = replicate 9 $ makeRandomRow gen 9 []
-
--- coords then array of possible values
+-- A Cell consists of coords then array of possible values
 data Cell = 
   Cell (Int, Int) [Int] 
   deriving (Eq, Ord, Show)
 
+-- A grid is simply a two dimensional array
 type Grid a = [[a]]
 type Coords = (Int,Int)
 
+-- Constants
+gridSize = 9
+boxesPerRow = 3
+boxSize = div gridSize boxesPerRow
+
+-- Creation
+-- --------
+
+-- A cell is initialised with its coords, and starts with all possible values
 newCell :: Coords -> Cell
-newCell c = Cell c [1..9]
+newCell c = Cell c [1..gridSize]
 
-
-newCellFromCount count num = newCell ((9 - count), (9 - num))
-
-mkGrid = makeCellRows 9
-
--- showCellGrid = putStrLn $ concat $ map (\x -> (show x) ++"\n") mkGrid
--- showRandCellGrid gen = putStrLn $ concat $ map (\x -> (show x) ++ "\n") (genRandGrid gen)
+newCellAtCoords x y = newCell ((gridSize - x), (gridSize - y))
 
 makeCellRow :: Int -> Int -> [Cell]
 makeCellRow 0 _ = []
-makeCellRow count num = ( newCellFromCount count num) : makeCellRow (count-1) num
+makeCellRow count num = (newCellAtCoords count num) : makeCellRow (count-1) num
 
 makeCellRows :: Int -> Grid Cell
 makeCellRows 0 = []
-makeCellRows count = makeCellRow 9 count : makeCellRows (count-1)
+makeCellRows count = makeCellRow gridSize count : makeCellRows (count-1)
 
--- *** *** *** Small *** *** *** 
+mkGrid = makeCellRows gridSize
 
-newSmallCellFromCount count num = newSmallCell ((4 - count), (4 - num))
-
-newSmallCell :: Coords -> Cell
-newSmallCell c = Cell c [1..3]
-
-makeSmallerGrid = makeSmallCellRows 3
-
-makeSmallCellRow :: Int -> Int -> [Cell]
-makeSmallCellRow 0 _ = []
-makeSmallCellRow count num = ( newSmallCellFromCount count num) : makeSmallCellRow (count-1) num
-
-makeSmallCellRows :: Int -> Grid Cell
-makeSmallCellRows 0 = []
-makeSmallCellRows count = makeSmallCellRow 3 count : makeSmallCellRows (count-1)
-
-generateSmallRandomValues :: Grid Cell -> Coords -> StdGen -> Grid Cell
-generateSmallRandomValues grid (_,4) gen = grid
-generateSmallRandomValues grid (4,y) gen = generateSmallRandomValues grid (1,y+1) gen
-generateSmallRandomValues grid bookmark gen = 
-  let cellToChange = getCell bookmark grid
-      (changedCell, ng) = setRandomValue gen cellToChange
-      (_,rowNum) = bookmark
-      row = grid !! (rowNum - 1)
-      changedRow = replaceCellInRow changedCell row 
-      newGrid = replaceRowInGrid changedRow grid
-      newBookMark = advanceBookMark bookmark
-  in generateSmallRandomValues newGrid newBookMark ng
- 
--- -- -- -- -- 
+-- Transformation
+-- --------------
 
 replaceCellInRow cell row = 
   let (Cell (x,_) values) = cell
@@ -133,18 +96,11 @@ replaceRowInGrid row grid =
       newB = tail b
   in t ++ [row] ++ newB
 
-getCell :: (Int, Int) -> [[a]] -> a
-getCell (x,y) grid = (grid !! (y)) !! (x)
-
 setValue :: Int -> Cell -> Cell
 setValue a cell = 
   let (Cell x list) = cell
   in Cell x [a]
 
--- Get the possible values for a cell
-getPoss :: Cell -> [Int]
-getPoss (Cell _ p) = p
- 
 -- Choose one of the possible values as the cells values
 setRandomValue :: StdGen -> Cell -> (Cell , StdGen)
 setRandomValue gen cell = 
@@ -154,25 +110,29 @@ setRandomValue gen cell =
 
 -- move the bookmark one cell forward
 -- advanceBookMark :: Num a => (a, b) -> (a, b)
-advanceBookMark (8,y) = (0,y+1)
-advanceBookMark bookmark =
-  let (c,r) = bookmark
-  in (c+1, r)
+-- advanceBookMark (8,y) = (0,y+1)
+advanceBookMark (c,r) 
+  | c == (gridSize - 1) = (0,r+1)
+  | otherwise = (c+1, r)
 
-generateRandomValues :: Grid Cell -> Coords -> StdGen -> (Grid Cell, StdGen)
-generateRandomValues grid (_,9) gen = (grid, gen)
-generateRandomValues grid bookmark gen = 
-  let cellToChange = getCell bookmark grid
-      (changedCell,ng) = setRandomValue gen cellToChange
-      newGrid = chooseCellInGrid changedCell grid
-      newBookMark = advanceBookMark bookmark
-  in  generateRandomValues newGrid newBookMark ng
+-- Querying
+-- --------
+
+getCell :: (Int, Int) -> [[a]] -> a
+getCell (x,y) grid = (grid !! (y)) !! (x)
+
+
+getCol :: Int -> Grid Cell -> [Cell]
+getCol c = map (!! c) 
+
+-- Get the possible values for a cell
+getPoss :: Cell -> [Int]
+getPoss (Cell _ p) = p
  
+getBoxRows boxCoord = take boxSize . drop (boxCoord * boxSize) 
+getBoxCols boxCoord = map $ take boxSize . drop (boxCoord * boxSize)
 
-getBoxRows boxCoord = take 3 . drop (boxCoord * 3) 
-getBoxCols boxCoord = map $ take 3 . drop (boxCoord * 3)
-
-getBoxCoord a = div a 3
+getBoxCoord a = div a boxSize
 
 getBoxCoords :: Coords -> Coords
 getBoxCoords (col,row) = 
@@ -187,48 +147,63 @@ getBox c g =
       (bc,br) = getBoxCoords (col,row)
   in getBoxCols bc $ getBoxRows br g
 
+-- Randomise
+generateRandomValues :: Grid Cell -> Coords -> StdGen -> (Grid Cell, StdGen)
+generateRandomValues grid (_,9) gen = (grid, gen)
+generateRandomValues grid bookmark gen = 
+  let cellToChange = getCell bookmark grid
+      (changedCell,ng) = setRandomValue gen cellToChange
+      newGrid = chooseCellInGrid changedCell grid
+      newBookMark = advanceBookMark bookmark
+  in  generateRandomValues newGrid newBookMark ng
+ 
+-- Validation
+-- ----------
+
 cellCoordsMatch :: Cell -> Cell -> Bool
 cellCoordsMatch a b = 
   getCellCoords a == getCellCoords b
 
-rowXOrColMatch:: Cell -> Cell -> Bool
+rowXOrColMatch :: Cell -> Cell -> Bool
 rowXOrColMatch a b = 
   let (ac,ar) = getCellCoords a
       (bc,br) = getCellCoords b
   in (ac == bc) /=  (ar == br)
 
-getCol :: Int -> Grid Cell -> [Cell]
-getCol c = map (!! c) 
 
-getNewVersion cells cell = 
-  let arrayWithNewCell = filter (cellCoordsMatch cell) cells
+-- replace cell with any in replacements that match the cell's coords
+replaceCellFrom replacements cell = 
+  let arrayWithNewCell = filter (cellCoordsMatch cell) replacements
   in if arrayWithNewCell == [] then cell else arrayWithNewCell !! 0 
 
-replaceCellsInGrid :: [Cell] -> Grid Cell -> Grid Cell
-replaceCellsInGrid cells grid = dmap (getNewVersion cells) grid
   -- iterate over grid
   -- if any cell is included in cells
   -- return the cell from cells 
+replaceCellsInGrid :: [Cell] -> Grid Cell -> Grid Cell
+replaceCellsInGrid cells grid = dmap (replaceCellFrom cells) grid
 
+removeCellValueFromCellArray :: Cell -> [Cell] -> [Cell]
+removeCellValueFromCellArray c arr = 
+  let val = getCellValue c
+  in map (filteredEliminateFromCell val c) arr
 
+removeCellValueFromGridUsingArray :: Cell -> [Cell] -> Grid Cell -> Grid Cell
+removeCellValueFromGridUsingArray c arr grid = 
+  let processedCells = removeCellValueFromCellArray c arr
+  in replaceCellsInGrid processedCells grid
 
 chooseCellInGrid :: Cell -> Grid Cell -> Grid Cell
 chooseCellInGrid c g = 
   let g2 = replaceCellsInGrid [c] g
-      (Cell (col,row) poss ) = c
+      (Cell (colnum,rownum) poss ) = c
       val:_ = poss
-      box = getBox c g2
-      flatBox = concat box
-      newFlatBox = map (filteredEliminateFromCell val c) flatBox 
-      g3 = replaceCellsInGrid newFlatBox g2
-      gridRow = g3 !! (row)
-      newRow = map (filteredEliminateFromCell val c) gridRow
-      g4 = replaceCellsInGrid newRow g3
-      gridCol = getCol (col) g4
-      newCol = map (filteredEliminateFromCell val c) gridCol
-      g5 = replaceCellsInGrid newCol g4
--- TODO
-  in g5
+      box = concat $ getBox c g2
+      row = g2 !! rownum
+      col = getCol colnum g2
+      g3 = removeCellValueFromGridUsingArray c box g2
+      g4 = removeCellValueFromGridUsingArray c row g3
+      g5 = removeCellValueFromGridUsingArray c col g4
+      in g5
 
 genRandGrid gen = 
   let (grid,gen2) = generateRandomValues (mkGrid) (0,0) gen
@@ -243,7 +218,7 @@ invalid  = anyInGrid (< 0)
 justCoords = dmap getCellCoords 
 justVals = dmap getCellValue 
 dmap = map . map
-contains = flip elem
+
 getCellValue (Cell _ v)
   | length v /= 1 = -1
   | otherwise = v !! 0 
@@ -262,7 +237,6 @@ filteredEliminateFromCell v newC oldC =
   then oldC 
   else eliminateFromCell v oldC
 
-
 eliminateFromCell :: Int ->  Cell -> Cell
 eliminateFromCell n (Cell c v) = (Cell c $ eliminateFromArray n v)
 
@@ -270,3 +244,11 @@ eliminateFromArray :: Int -> [Int] -> [Int]
 eliminateFromArray n arr = 
   let filteredArray = filter (\x -> x /= n) arr
   in if filteredArray == [] then [-5] else filteredArray
+
+randomNumberFromArray :: StdGen -> [Int] -> (Int, StdGen)
+randomNumberFromArray gen arr = 
+  let l = length arr
+      lastIndex = l - 1
+      (i,g) = randomR (0,lastIndex) gen 
+      n = arr !! i
+  in (n,g)
