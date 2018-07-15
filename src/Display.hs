@@ -1,15 +1,13 @@
 module Display
       ( boxEdgeH
       , gridSideEdge
-      , gridSpaceRow
       , emptyGrid
-      , displayEmptyGrid
-      , fakeNumberGrid
       , makeNumberRowSegment
-      , fakeCharGrid
       , displayNumberGrid 
+, displayCellGrid
       ) where
 
+import Lib
 import Data.Char
 import Data.List
 import Data.String.Utils(replace)
@@ -41,27 +39,24 @@ cyan = "\ESC[36m"
 white = "\ESC[37m"
 
 
-int2char a = (show a) !! 0
-fakeNumberGrid = replicate 9 [1..9]
-fakeCharGrid = map (map int2char) fakeNumberGrid
-
-formattedFakeNumberGrid = concat $ map appendNewLine fakeCharGrid 
-
-
--- actually puts it on the screen
-displayEmptyGrid = putStrLn $ emptyGrid(fakeCharGrid)
+-- actually put it on the screen
 displayNumberGrid grid = putStrLn $ emptyGrid grid
+
+
+errors = ['-','a','b','c','d','e','f','g','h','i','j']
+showValueOrError a = if a > 0 then blue ++ show a 
+else red ++ [errors !! (negate a)]
+
+displayCellGrid grid = displayNumberGrid $ dmap showValueOrError $ justVals grid
 
 -- Full grid display as string
 emptyGrid g = 
   let top = take 3 g
       mid = take 3 $ drop 3 g
       bot = take 3 $ drop 6 g
-  in mergeBoxEdges $ (boxRow top)++ (boxRow mid) ++ (boxRow bot)
+  in mergeBoxEdges $ (boxRow top) ++ (boxRow mid) ++ (boxRow bot)
 
 {-|
-
-replace "replace" "pave" "please replace this with a replacement" 
 
 Prints:
 
@@ -108,9 +103,8 @@ makeGuideSegmentH a = guideCorner ++ cellGuideH ++ makeGuideSegmentH (a - 1)
 boxEdgeH = makeEdgeSegmentH 2 
 boxGuideH = makeGuideSegmentH 2
 boxSpaceOnlyRow = verticalEdgeSegment ++ makeSpaceOnlyRowSegment(2)
-boxSpaceRow = verticalEdgeSegment ++ makeSpaceRowSegment(2)
 
-boxNumberRow :: [Char] -> [Char]
+boxNumberRow :: [[Char]] -> [Char]
 boxNumberRow a = verticalEdgeSegment ++ makeNumberRowSegment(a)
 
 -- prints "     :     :     :"
@@ -118,15 +112,12 @@ makeSpaceOnlyRowSegment :: Int -> [Char]
 makeSpaceOnlyRowSegment 0 = "     " ++ verticalGuideSegment 
 makeSpaceOnlyRowSegment a = "     " ++ verticalGuideSegment ++ makeSpaceOnlyRowSegment(a - 1) 
 
-makeSpaceRowSegment :: Int -> [Char]
-makeSpaceRowSegment 0 = "  " ++ blue ++ "0  " ++ verticalGuideSegment 
-makeSpaceRowSegment a = "  " ++ blue ++ (show a) ++ "  " ++ verticalGuideSegment ++ makeSpaceRowSegment(a - 1) 
 
-makeNumberRowSegment :: [Char] -> [Char]
+makeNumberRowSegment :: [[Char]] -> [Char]
 makeNumberRowSegment [] = ""
 makeNumberRowSegment x = 
   let a:as = x
-  in "  " ++ blue ++ [a] ++ "  " ++ verticalGuideSegment ++ makeNumberRowSegment(as) 
+  in "  " ++ a ++ "  " ++ verticalGuideSegment ++ makeNumberRowSegment(as) 
 
 -- Merging
 mergeEdges s =  replace (verticalGuideSegment ++ verticalEdgeSegment) (verticalEdgeSegment) (s)
@@ -138,9 +129,7 @@ gridSideEdge = mergeCorners $ boxEdgeH ++ boxEdgeH ++ boxEdgeH
 
 gridHGuide = mergeGuideCorners $  boxGuideH ++ boxGuideH ++ boxGuideH 
 
-gridSpaceRow = mergeEdges $ boxSpaceRow ++ boxSpaceRow ++ boxSpaceRow ++ verticalEdgeSegment 
-
-gridNumberRow :: [Char] -> [Char]
+gridNumberRow :: [[Char]] -> [Char]
 gridNumberRow x =
   let a : b : c : d : e : f : g : h : i : [] = x
   in mergeEdges $ (boxNumberRow [a,b,c]) ++ (boxNumberRow [d,e,f]) ++ (boxNumberRow [g,h,i]) ++ verticalEdgeSegment

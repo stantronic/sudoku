@@ -11,7 +11,8 @@ main = do
   -- hSetBuffering stdout NoBuffering
   let (grid,iter) = genRandGrid gen 0
   do
-    displayNumberGrid $ dmap int2char $ justVals grid
+    displayCellGrid grid
+    -- displayNumberGrid $ dmap int2char $ justVals grid
     putStrLn $ "Iterations = " ++ (show iter)
 
 -- exit a = a == "q"

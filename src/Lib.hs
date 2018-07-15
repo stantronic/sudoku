@@ -12,12 +12,9 @@ module Lib
     , chooseCellInGrid
     , filteredEliminateFromCell
     , advanceBookMark 
-    , replaceCellInRow
     , replaceCellFrom
-    , replaceRowInGrid
     , replaceCellsInGrid
     , eliminateFromCell
-    , eliminateFromRow
 -- Retrieval
     , justVals 
     , justCoords 
@@ -30,20 +27,20 @@ module Lib
     , getCellValue
 -- Query
     , cellCoordsMatch
+    , invalid
 -- Randomness
     , genRandGrid
     , generateRandomValues
     , setRandomValue
     , randomNumberFromArray 
 -- Utils
-    , invalid
     , dmap
-    , int2char 
+    -- , int2char 
+    , concatFunc
     ) where
 
-import Display
 import System.Random
-
+import Data.Maybe
                                     -- Types
                                     -- -----
 
@@ -85,15 +82,6 @@ mkGrid = makeCellRows gridSize
                                -- Transformation
                                -- --------------
 
-replaceCellInRow cell row = [ if cellCoordsMatch x cell then cell else x | x <- row ] 
-
-replaceRowInGrid row grid = 
-  let c = row !! 0
-      (Cell (_,rowNum) _) = c
-      (t,b) = splitAt (rowNum) grid
-      newB = tail b
-  in t ++ [row] ++ newB
-
 setValue :: Int -> Cell -> Cell
 setValue a cell = 
   let (Cell x list) = cell
@@ -107,16 +95,15 @@ setRandomValue gen cell =
   in (setValue n cell,g2) 
 
 -- move the bookmark one cell forward
--- advanceBookMark :: Num a => (a, b) -> (a, b)
--- advanceBookMark (8,y) = (0,y+1)
+advanceBookMark :: Coords -> Coords
 advanceBookMark (c,r) 
   | c == (gridSize - 1) = (0,r+1)
   | otherwise = (c+1, r)
 
-                                  -- Querying
+                                  -- Retrieval
                                   -- --------
 
--- Querying individual cells
+-- Retrieving values from individual cells
 
 getCell :: (Int, Int) -> [[a]] -> a
 getCell (x,y) grid = (grid !! (y)) !! (x)
@@ -130,18 +117,21 @@ getCellRow (Cell (_,r) _) = r
 getCellCol :: Cell -> Int
 getCellCol (Cell (c,_) _) = c
 
--- Get the resolved value of a cell (or -1 if all possibilities have been removed)
+-- Get the resolved value of a cell (or -10 if all possibilities have been removed)
 getCellValue (Cell _ v)
-  | length v /= 1 = -1
+  | length v /= 1 = -10
   | otherwise = v !! 0 
 
 -- Get the possible values for a cell
 getCellPossibilities :: Cell -> [Int]
 getCellPossibilities (Cell _ p) = p
- 
 
+-- Retrieving values from the whole grid
 getCol :: Int -> Grid Cell -> [Cell]
 getCol c = map (!! c) 
+
+getRow :: Int -> Grid Cell -> [Cell]
+getRow c g = g !! c
 
 getBoxRows boxCoord = take boxSize . drop (boxCoord * boxSize) 
 getBoxCols boxCoord = map $ take boxSize . drop (boxCoord * boxSize)
@@ -185,17 +175,32 @@ rowXOrColMatch a b =
       (bc,br) = getCellCoords b
   in (ac == bc) /=  (ar == br)
 
+cellHasOneValue :: Cell -> Bool
+cellHasOneValue (Cell c v) = length v == 1
 
--- replace cell with any in replacements that match the cell's coords
+-- returns a tuple of 
+  -- a) the cell, or the cell's replacement if one exists in replacements
+  -- b) a maybe cell, which will contain the replacement if making the replacement narrows its possibilties to 1 value
+replaceCellFrom :: [Cell] -> Cell -> (Cell, Maybe Cell)
 replaceCellFrom replacements cell = 
   let arrayWithNewCell = filter (cellCoordsMatch cell) replacements
-  in if arrayWithNewCell == [] then cell else arrayWithNewCell !! 0 
+  in if arrayWithNewCell == [] then (cell, Nothing) 
+  else 
+    let newCell = head arrayWithNewCell 
+        maybeCell = if cellHasOneValue newCell && not (cellHasOneValue cell) then Just newCell else Nothing
+    in (newCell, maybeCell)
 
-  -- iterate over grid
-  -- if any cell is included in cells
-  -- return the cell from cells 
+
+-- Given a list of cells return a grid with those cells inserted
+-- If any replacement results in reducing its possibilities to one, then choose that cell in the grid
 replaceCellsInGrid :: [Cell] -> Grid Cell -> Grid Cell
-replaceCellsInGrid cells grid = dmap (replaceCellFrom cells) grid
+replaceCellsInGrid newCells grid = 
+  let newGridWithOneValues = dmap (replaceCellFrom newCells) grid
+      getCellOnly (c, _) = c
+      getOneValueCells (_, x) = x
+      newGrid = dmap getCellOnly newGridWithOneValues  
+      maybes = catMaybes $ concat $ dmap getOneValueCells newGridWithOneValues
+  in if length maybes > 0 then chooseCellInGrid (maybes !! 0) newGrid else newGrid
 
 removeCellValueFromCellArray :: Cell -> [Cell] -> [Cell]
 removeCellValueFromCellArray c arr = 
@@ -210,51 +215,49 @@ removeCellValueFromGridUsingArray c arr grid =
 chooseCellInGrid :: Cell -> Grid Cell -> Grid Cell
 chooseCellInGrid c g = 
   let g2 = replaceCellsInGrid [c] g
-      (Cell (colnum,rownum) poss ) = c
-      val:_ = poss
+      (Cell (colnum,rownum) _ ) = c
       box = concat $ getBox c g2
-      row = g2 !! rownum
+      row = getRow rownum g2
       col = getCol colnum g2
-      g3 = removeCellValueFromGridUsingArray c box g2
-      g4 = removeCellValueFromGridUsingArray c row g3
-      g5 = removeCellValueFromGridUsingArray c col g4
-      in g5
+      eliminatePossibilities = concatFunc $ map (removeCellValueFromGridUsingArray c) [box, row, col] 
+      in eliminatePossibilities g2
 
 genRandGrid :: StdGen -> Int -> (Grid Cell, Int)
 genRandGrid gen iter = 
   let (grid,gen2) = generateRandomValues (mkGrid) (0,0) gen
-  in if invalid grid then genRandGrid gen2 (iter+1) else (grid, iter)
+  in if invalid grid then genRandGrid gen2 (iter+1) else (grid, iter + 1)
 
                         -- *** *** *** UTILS *** *** ***
 
+concatFunc (a:[]) = a
+concatFunc (a:as) = (concatFunc as) . a
+
 anyInValGrid = any . any
 anyInGrid f grid = anyInValGrid f $ justVals grid
-invalid  = anyInGrid (< 0) 
+invalid = anyInGrid (< 0) 
 
 justCoords = dmap getCellCoords 
 justVals = dmap getCellValue 
 dmap = map . map
 
+-- int2char :: Int -> Char
+-- int2char a = (show a) !! 0
 
-int2char :: Int -> Char
-int2char a = (show a) !! 0
-
-eliminateFromRow :: Int -> [Cell] -> [Cell]
-eliminateFromRow = map . eliminateFromCell
-
+-- Will eliminate the newCells value from the oldCell unless the coords match
 filteredEliminateFromCell :: Int -> Cell -> Cell -> Cell
 filteredEliminateFromCell v newC oldC = 
   if cellCoordsMatch newC oldC 
   then oldC 
-  else eliminateFromCell v oldC
+  else eliminateFromCell  newC oldC
 
-eliminateFromCell :: Int ->  Cell -> Cell
-eliminateFromCell n (Cell c v) = (Cell c $ eliminateFromArray n v)
+-- eliminate the first cell's value from the second cell's possibilities
+eliminateFromCell :: Cell ->  Cell -> Cell
+eliminateFromCell (Cell _ v1) (Cell c2 v2) = (Cell c2 $ eliminateFromArray (head v1) v2)
 
 eliminateFromArray :: Int -> [Int] -> [Int]
 eliminateFromArray n arr = 
   let filteredArray = filter (\x -> x /= n) arr
-  in if filteredArray == [] then [-5] else filteredArray
+  in if filteredArray == [] then [negate n] else filteredArray
 
 randomNumberFromArray :: StdGen -> [Int] -> (Int, StdGen)
 randomNumberFromArray gen arr = 
