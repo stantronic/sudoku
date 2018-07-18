@@ -15,14 +15,3 @@ main = do
     -- displayNumberGrid $ dmap int2char $ justVals grid
     putStrLn $ "Iterations = " ++ (show iter)
 
--- exit a = a == "q"
-
----- playTurn :: a -> IO()
---  putStrLn $ "Welcome"
---  putStr "Please enter a number > "
---  number <- getLine
---  if exit number then
---    putStrLn "Bye!"
---  else
---    playTurn newGen
-

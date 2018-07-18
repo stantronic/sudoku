@@ -2,6 +2,8 @@ module Lib
     ( 
 -- Types
       Cell(Cell)
+    , Grid
+    , CellPlayState (Hidden,Revealed,Guessed) 
 -- Constants
     , gridSize
 -- Creation
@@ -29,13 +31,13 @@ module Lib
     , cellCoordsMatch
     , invalid
 -- Randomness
+    , randomCoords 
     , genRandGrid
     , generateRandomValues
     , setRandomValue
     , randomNumberFromArray 
 -- Utils
     , dmap
-    -- , int2char 
     , concatFunc
     ) where
 
@@ -54,6 +56,10 @@ type Grid a = [[a]]
 
 -- Coords are a tuple - (column, row) beginning at 0,0 in the top left
 type Coords = (Int,Int)
+
+-- type PlayState = 'h' | 'r' | 'g'
+data CellPlayState = Hidden | Revealed | Guessed
+  deriving (Eq)
 
 -- Constants
 gridSize = 9
@@ -161,7 +167,13 @@ generateRandomValues grid bookmark gen =
       newGrid = chooseCellInGrid changedCell grid
       newBookMark = advanceBookMark bookmark
   in  generateRandomValues newGrid newBookMark ng
- 
+
+randomCoords :: StdGen ->  (Coords, StdGen)
+randomCoords gen = 
+  let (x,gen2) = randomNumberFromArray gen [0..8]
+      (y,gen3) = randomNumberFromArray gen2 [0..8]
+  in ((x,y), gen3) 
+
                                  -- Validation
                                  -- ----------
 
@@ -240,8 +252,7 @@ justCoords = dmap getCellCoords
 justVals = dmap getCellValue 
 dmap = map . map
 
--- int2char :: Int -> Char
--- int2char a = (show a) !! 0
+lastIndex arr = (length arr) -1
 
 -- Will eliminate the newCells value from the oldCell unless the coords match
 filteredEliminateFromCell :: Int -> Cell -> Cell -> Cell
@@ -261,8 +272,7 @@ eliminateFromArray n arr =
 
 randomNumberFromArray :: StdGen -> [Int] -> (Int, StdGen)
 randomNumberFromArray gen arr = 
-  let l = length arr
-      lastIndex = l - 1
-      (i,g) = randomR (0,lastIndex) gen 
+  let li = lastIndex arr
+      (i,g) = randomR (0,li) gen 
       n = arr !! i
   in (n,g)
